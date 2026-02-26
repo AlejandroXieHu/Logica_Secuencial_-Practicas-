@@ -5,6 +5,12 @@ module BCD_4Displays_W (
     
 );
 
-    BCD_4Displays WRAP (.bcd_in(SW), .D_un(HEX0), .D_de(HEX1), .D_ce(HEX2), .D_mi(HEX3));
+    BCD_4Displays WRAP (
+        .bcd_in(SW), 
+        .D_un(HEX0), 
+        .D_de(HEX1), 
+        .D_ce(HEX2), 
+        .D_mi(HEX3)
+    );
 
 endmodule
