@@ -11,9 +11,24 @@ module BCD_4Displays #(parameter N_in = 10, N_out = 7) (
     assign centenas = (bcd_in / 100) % 10;
     assign millares = (bcd_in / 1000) % 10;
 
-    BCD_module Unidades (.bcd_in(unidades), .bcd_out(D_un));
-    BCD_module Decenas (.bcd_in(decenas), .bcd_out(D_de));
-    BCD_module Centenas (.bcd_in(centenas), .bcd_out(D_ce));
-    BCD_module Millares (.bcd_in(millares), .bcd_out(D_mi));
+    BCD_module Unidades (
+        .bcd_in(unidades), 
+        .bcd_out(D_un)
+    );
+
+    BCD_module Decenas (
+        .bcd_in(decenas), 
+        .bcd_out(D_de)
+    );
+
+    BCD_module Centenas (
+        .bcd_in(centenas), 
+        .bcd_out(D_ce)
+    );
+
+    BCD_module Millares (
+        .bcd_in(millares), 
+        .bcd_out(D_mi)
+    );
 
 endmodule
