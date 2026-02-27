@@ -96,6 +96,11 @@ module BCD_module_tb();
 
 endmodule
 ```
+---
+
+## Testbench
+
+![Testbench](BCD_4Displays_tb.png)
 
 ---
 
@@ -190,13 +195,6 @@ module BCD_4Displays_tb();
 endmodule
 ```
 
----
-
-## Testbench
-
-![Testbench](BCD_4Displays_tb.png)
-
----
 
 ## Simulación del Wrapper
 
