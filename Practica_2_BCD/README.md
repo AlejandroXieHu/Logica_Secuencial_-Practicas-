@@ -229,4 +229,4 @@ endmodule
 
 ## Pruebas con la tarjeta FPGA DE10-Lite
 
-[Ver demostración](BCD_4Displays.mp4)
+[Ver video de la prueba](BCD_4Displays.mp4)
