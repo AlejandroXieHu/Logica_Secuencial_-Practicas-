@@ -2,8 +2,8 @@ module password_tb();
 
     reg clk;
     reg rst;
-    reg next;
-    reg [3:0] switch;
+    reg load;
+    reg [3:0] SW;
 
     wire [6:0] HEX0;
     wire [6:0] HEX1;
@@ -13,8 +13,8 @@ module password_tb();
     password dut(
         .clk(clk),
         .rst(rst),
-        .next(next),
-        .switch(switch),
+        .load(load),
+        .SW(SW),
         .HEX0(HEX0),
         .HEX1(HEX1),
         .HEX2(HEX2),
@@ -30,34 +30,37 @@ module password_tb();
     initial 
         begin
             rst = 1; 
-            next = 0; 
-            switch = 0; 
+            load = 0; 
+            SW = 0; 
             #20;
 
             rst = 0;
 
-            switch = 4'h1; #20;
-            next = 1; #20;
-            next = 0; #20;
+            // Contraseña correcta: 1-2-3-4
+            SW = 4'h1; #20;
+            load = 1; #20;
+            load = 0; #20;
 
-            switch = 4'h2; #20;
-            next = 1; #20;
-            next = 0; #20;
+            SW = 4'h2; #20;
+            load = 1; #20;
+            load = 0; #20;
 
-            switch = 4'h3; #20;
-            next = 1; #20;
-            next = 0; #20;
+            SW = 4'h3; #20;
+            load = 1; #20;
+            load = 0; #20;
 
-            switch = 4'h4; #20;
-            next = 1; #20;
-            next = 0; #40;
+            SW = 4'h4; #20;
+            load = 1; #20;
+            load = 0; #40;
 
+            // Reset
             rst = 1; #20;
             rst = 0; #20;
 
-            switch = 4'h5; #20;
-            next = 1; #20;
-            next = 0; #40;
+            // Contraseña incorrecta
+            SW = 4'h5; #20;
+            load = 1; #20;
+            load = 0; #40;
 
             $stop;
             $finish;
@@ -65,7 +68,8 @@ module password_tb();
 
     initial 
         begin
-            $monitor("rst = %b, next = %b, switch = %h, HEX3 = %b, HEX2 = %b, HEX1 = %b, HEX0 = %b", rst, next, switch, HEX3, HEX2, HEX1, HEX0);
+            $monitor("rst = %b, load = %b, SW = %h, HEX3 = %b, HEX2 = %b, HEX1 = %b, HEX0 = %b",
+                     rst, load, SW, HEX3, HEX2, HEX1, HEX0);
         end
 
     initial 
