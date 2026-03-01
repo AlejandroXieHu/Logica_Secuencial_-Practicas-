@@ -217,7 +217,7 @@ endmodule
 
 ## Simulación del testbench
 
-![Simulación](BCD_4Displays_SIM.png)
+![Simulación](BCD_4Displays_tb_SIM.png)
 
 ---
 
