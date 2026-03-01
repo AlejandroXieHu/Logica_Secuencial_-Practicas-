@@ -991,33 +991,33 @@ endmodule
 
 ## Testbench
 
-![Testbench](Password_tb.png)
+![Testbench](Practica_4_Password/Password_tb.png)
 
 ---
 
 ## Simulación del testbench
 
-![Simulación](Password_SIM.png)
+![Simulación](Practica_4_Password/Password_SIM.png)
 
 ---
 
 ## RTL
 
-![RTL](Password_RTL.png)
+![RTL](Practica_4_Password/Password_RTL.png)
 
 ---
 
 ## Máquina de Estados (FSM)
 
-![State Machine](Password_SM.png)
+![State Machine](Practica_4_Password/Password_SM.png)
 
 ---
 
 ## Prueba en la tarjeta FPGA
 
-[Ver video de la prueba](Password.mp4)
+[Ver video de la prueba](Practica_4_Password/Password.mp4)
 
 
 ## Prueba en la tarjeta FPGA
 
-[Ver video de la prueba](Practica_3_Contador_Sincrono/Counter.mp4)
+[Ver video de la prueba](Practica_4_Password/Password.mp4)
