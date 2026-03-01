@@ -2,8 +2,8 @@ module password (
 
     input clk,
     input rst,
-    input next,
-    input [3:0] switch,
+    input load,
+    input [3:0] SW,
 
     output reg [6:0] HEX0,
     output reg [6:0] HEX1,
@@ -23,89 +23,105 @@ module password (
 
     reg [2:0] state, next_state;
 
-    reg next_d;
-    wire next_edge;
+    reg load_sync0, load_sync1;
+    wire load_pulse;
+
+    wire [6:0] bcd_out;
+
+    BCD_module bcd_inst (
+        .bcd_in(SW),
+        .bcd_out(bcd_out)
+    );
+
 
     always @(posedge clk)
-        next_d <= next;
+		 begin
+			  load_sync0 <= load;
+			  load_sync1 <= load_sync0;
+		 end
 
-    assign next_edge = next & ~next_d;
+    assign load_pulse = load_sync0 & ~load_sync1;
 
     always @(posedge clk or posedge rst)
-        begin
-            if (rst)
-                state <= IDLE;
-            else
-                state <= next_state;
-        end
+		 begin
+			  if (rst)
+					state <= IDLE;
+			  else
+					state <= next_state;
+		 end
 
     always @(*)
-        begin
-            next_state = state;
+		 begin
+			  next_state = state;
 
-            case (state)
+			  case (state)
 
-                IDLE:
-                    if (next_edge)
-                        if (switch == password[15:12])
-                            next_state = S1;
-                        else
-                            next_state = BAD;
+					IDLE:
+						 if (load_pulse)
+							  if (SW == password[15:12])
+									next_state = S1;
+							  else
+									next_state = BAD;
 
-                S1:
-                    if (next_edge)
-                        if (switch == password[11:8])
-                            next_state = S2;
-                        else
-                            next_state = BAD;
+					S1:
+						 if (load_pulse)
+							  if (SW == password[11:8])
+									next_state = S2;
+							  else
+									next_state = BAD;
 
-                S2:
-                    if (next_edge)
-                        if (switch == password[7:4])
-                            next_state = S3;
-                        else
-                            next_state = BAD;
+					S2:
+						 if (load_pulse)
+							  if (SW == password[7:4])
+									next_state = S3;
+							  else
+									next_state = BAD;
 
-                S3:
-                    if (next_edge)
-                        if (switch == password[3:0])
-                            next_state = GOOD;
-                        else
-                            next_state = BAD;
+					S3:
+						 if (load_pulse)
+							  if (SW == password[3:0])
+									next_state = GOOD;
+							  else
+									next_state = BAD;
 
-                GOOD:
-                    next_state = GOOD;
+					GOOD:
+						 next_state = GOOD;
 
-                BAD:
-                    next_state = BAD;
-            endcase
-        end
+					BAD:
+						 next_state = BAD;
+
+			  endcase
+		 end
 
     always @(*)
-        begin
-            HEX0 = 7'b1111111;
-            HEX1 = 7'b1111111;
-            HEX2 = 7'b1111111;
-            HEX3 = 7'b1111111;
+		 begin
+			  HEX0 = 7'b1111111;
+			  HEX1 = 7'b1111111;
+			  HEX2 = 7'b1111111;
+			  HEX3 = 7'b1111111;
 
-            case (state)
+			  case (state)
 
-                GOOD:
-                begin
-                    HEX3 = 7'b1000010; // G
-                    HEX2 = 7'b1000000; // O
-                    HEX1 = 7'b1000000; // O
-                    HEX0 = 7'b0100001; // D
-                end
+					IDLE, S1, S2, S3:
+						 HEX0 = bcd_out;
 
-                BAD:
-                begin
-                    HEX3 = 7'b0000011; // b
-                    HEX2 = 7'b0001000; // A
-                    HEX1 = 7'b0100001; // d
-                    HEX0 = 7'b1111111; // Apagado
-                end
-            endcase
-        end
+					GOOD:
+					begin
+						 HEX3 = ~7'b0111101; // G
+						 HEX2 = ~7'b1111110; // O
+						 HEX1 = ~7'b1111110; // O
+						 HEX0 = ~7'b0111101; // d
+					end
+
+					BAD:
+					begin
+						 HEX3 = ~7'b0011111; // b
+						 HEX2 = ~7'b1110111; // A
+						 HEX1 = ~7'b0111101; // D
+						 HEX0 = 7'b1111111; // Display apagado
+					end
+
+			  endcase
+		 end
 
 endmodule
