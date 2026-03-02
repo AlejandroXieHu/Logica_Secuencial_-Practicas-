@@ -9,11 +9,11 @@ module counter #(parameter CMAX = 100) (
 
 );
 
-    always @(posedge clk)
+    always @(posedge clk or posedge rst)
         begin
             if (rst)
                 begin
-                    count <= 0;
+                    count <= 14'd0;
                 end
             else if (load)
                 begin
@@ -22,13 +22,13 @@ module counter #(parameter CMAX = 100) (
             else if (up_down)
                 begin
                     if (count == CMAX)
-                        count <= 0;
+                        count <= 14'd0;
                     else
                         count <= count + 1;
                 end
             else
                 begin
-                    if (count == 0)
+                    if (count == 14'd0)
                         count <= CMAX;
                     else
                         count <= count - 1;
