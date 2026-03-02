@@ -27,7 +27,7 @@ endmodule
 
 ## BCD_Module.v
 
-Este módulo convierte un dígito BCD (0–9) a su representación en display de 7 segmentos.
+Este módulo convierte un dígito BCD a su representación en display de 7 segmentos.
 
 ```verilog
 module BCD_module (
