@@ -2,7 +2,7 @@ module counter_wr (
 
     input MAX10_CLK1_50,
     input [1:0] KEY,
-    input [13:0] SW,
+    input [9:0] SW,
 
     output [0:6] HEX0,
     output [0:6] HEX1,
@@ -20,8 +20,8 @@ module counter_wr (
 
     assign rst = ~KEY[0];
     assign load = ~KEY[1];
-    assign up_down = SW[13];
-    assign data_in = SW;
+    assign up_down = SW[9];
+    assign data_in = {5'b00000, SW[8:0]};
 
     clock_divider #(.FREQ(1)) clk_div (
         .clk(MAX10_CLK1_50), 
