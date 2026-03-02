@@ -11,7 +11,7 @@ module clock_divider #(parameter FREQ = 1) (
 
     reg [31:0] count;
 
-    always @(posedge clk)
+    always @(posedge clk or posedge rst)
         begin
             if (rst == 1'b1)
                 begin
@@ -27,7 +27,7 @@ module clock_divider #(parameter FREQ = 1) (
                 end
         end
 
-    always @(posedge clk)
+    always @(posedge clk or posedge rst)
         begin
             if (rst == 1'b1)
                 begin
