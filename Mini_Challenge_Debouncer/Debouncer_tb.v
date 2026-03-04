@@ -54,4 +54,11 @@ module debouncer_tb;
         $display("Fin de simulación");
         $finish;
     end
+
+    initial 
+        begin
+            $dumpfile("debouncer_tb.vcd");
+            $dumpvars(0, debouncer_tb);
+        end
+
 endmodule
