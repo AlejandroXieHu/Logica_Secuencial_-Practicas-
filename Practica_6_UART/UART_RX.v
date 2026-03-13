@@ -4,7 +4,7 @@ module UART_RX #(parameter BAUD_RATE = 9600, parameter CLOCK_FREQ = 50000000, pa
     input rst,
     input rx_in,
 
-    output reg [BITS-1:0] data_out,
+    output reg [BITS - 1:0] data_out,
     output reg data_ready
 
 );
