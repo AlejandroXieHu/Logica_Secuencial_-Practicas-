@@ -2,7 +2,7 @@ module UART_TX #(parameter BAUD_RATE = 9600, parameter CLOCK_FREQ = 50000000, pa
 
     input wire clk,
     input wire rst,
-    input wire [BITS-1:0] data_in,
+    input wire [BITS - 1:0] data_in,
     input wire start,
 
     output reg tx_out,
