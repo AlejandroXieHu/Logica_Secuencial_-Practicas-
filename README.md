@@ -367,7 +367,7 @@ endmodule
 
 ## BCD_module.v
 
-Este módulo convierte un dígito BCD (0–9) a su representación en display de 7 segmentos.
+Este módulo convierte un dígito BCD a su representación en display de 7 segmentos.
 
 ```verilog
 module BCD_module (
@@ -688,6 +688,12 @@ endmodule
 ## RTL
 
 ![RTL](Practica_3_Contador_Sincrono/Counter_RTL.png)
+
+---
+
+## Prueba en la tarjeta FPGA
+
+[Ver video de la prueba](Practica_3_Contador_Sincrono/Counter.mp4)
 
 ---
 
@@ -1016,3 +1022,1155 @@ endmodule
 ## Prueba en la tarjeta FPGA
 
 [Ver video de la prueba](Practica_4_Password/Password.mp4)
+
+---
+
+# Práctica 5: PWM
+
+## PWM.v
+
+Este módulo implementa un generador de **PWM (Pulse Width Modulation)** para controlar el ángulo de un servo utilizando los switches de la FPGA.  
+El valor ingresado en los switches representa el **grado del servo (0° a 180°)**. Si el valor supera 180, se limita automáticamente.  
+El sistema también muestra el valor del ángulo en **tres displays de 7 segmentos**.
+
+```verilog
+module PWM (
+
+    input MAX10_CLK1_50,
+    input [9:0] SW,
+
+    output [15:0] ARDUINO_IO,
+    output [0:6] HEX0,
+    output [0:6] HEX1,
+    output [0:6] HEX2
+
+);
+
+    wire rst = SW[0];
+    wire [7:0] grado_raw = SW[8:1];
+
+    reg [7:0] grado;
+
+    wire [3:0] uni;
+    wire [3:0] dec;
+    wire [3:0] cen;
+
+    always @(*)
+        begin
+            if (grado_raw > 8'd180)
+                grado = 8'd180;
+            else
+                grado = grado_raw;
+        end
+
+    wire clk_div;
+    reg [18:0] count = 0;
+    wire [18:0] duty;
+    wire arduino;
+
+    parameter maxCount = 500000;
+
+    clock_divider #(.FREQ(25000000)) clkdiv (
+        .clk(MAX10_CLK1_50),
+        .rst(rst),
+        .clk_div(clk_div)
+    );
+
+    assign duty = 25000 + (grado * 25000) / 180;
+
+    always @(posedge clk_div or posedge rst)
+        begin
+            if (rst)
+                count <= 0;
+            else if (count >= maxCount)
+                count <= 0;
+            else
+                count <= count + 1;
+        end
+
+    assign arduino = (count < duty);
+    assign ARDUINO_IO[0] = arduino;
+
+    assign uni = grado % 10;
+    assign dec = (grado / 10) % 10;
+    assign cen = (grado / 100) % 10;
+
+    BCD_module d0 (
+        .bcd_in(uni), 
+        .bcd_out(HEX0)
+    );
+
+    BCD_module d1 (
+        .bcd_in(dec), 
+        .bcd_out(HEX1)
+    );
+
+    BCD_module d2 (
+        .bcd_in(cen), 
+        .bcd_out(HEX2)
+    );
+
+endmodule
+```
+
+---
+
+## PWM_tb.v
+
+El **testbench** se utiliza para verificar el funcionamiento del generador PWM.  
+Se simula el reloj de 50 MHz, se aplica un reset inicial y posteriormente se prueban distintos valores de ángulo generados aleatoriamente.
+
+```verilog
+module PWM_tb ();
+
+    //Señales de entrada
+    reg MAX10_CLK1_50;
+    reg [9:0] SW;
+
+    //Señales de salida
+    wire [15:0] ARDUINO_IO;
+    wire [0:6] HEX0;
+    wire [0:6] HEX1;
+    wire [0:6] HEX2;
+
+    //Instancia del módulo
+    PWM PWM (
+        .MAX10_CLK1_50(MAX10_CLK1_50),
+        .SW(SW),
+        .ARDUINO_IO(ARDUINO_IO),
+        .HEX0(HEX0),
+        .HEX1(HEX1),
+        .HEX2(HEX2)
+    );
+
+    initial
+        begin
+            MAX10_CLK1_50 = 0;
+            SW = 10'b0;
+        end
+
+    always
+        #10 MAX10_CLK1_50 = ~MAX10_CLK1_50;
+
+    initial
+        begin
+            $display("Simulacion iniciada");
+
+            #30;
+
+            SW[0] = 1;
+            #20;
+            SW[0] = 0;
+
+            #1000;
+
+            repeat(6)
+                begin
+                    SW[8:1] = $random % 200;
+                    #2000000;
+
+                    $display("Grados solicitados = %d | Grados limitados = %d | PWM = %b", SW[8:1], PWM.grado, ARDUINO_IO[0]);
+                end
+
+            $stop;
+            $finish;
+        end
+
+    initial
+        begin
+            $dumpfile("PWM_tb.vcd");
+            $dumpvars(0, PWM_tb);
+        end
+
+endmodule
+```
+
+---
+
+## clock_divider.v
+
+Este módulo divide la frecuencia del reloj de la FPGA para generar un reloj más lento que pueda ser utilizado por otros módulos del sistema.
+
+```verilog
+module clock_divider #(parameter FREQ = 1) (
+
+    input clk,
+    input rst,
+    output reg clk_div
+
+);
+
+    parameter CLK_FREQ = 50000000;
+    parameter COUNT_MAX = (CLK_FREQ / (2 * FREQ));
+
+    reg [31:0] count;
+
+    always @(posedge clk)
+        begin
+            if (rst == 1'b1)
+                begin
+                    count <= 32'b0;
+                end
+            else if (count == COUNT_MAX - 1)
+                begin
+                    count <= 32'b0;
+                end
+            else
+                begin
+                    count <= count + 1;
+                end
+        end
+
+    always @(posedge clk)
+        begin
+            if (rst == 1'b1)
+                begin
+                    clk_div <= 1'b0;
+                end
+            else if (count == COUNT_MAX - 1)
+                begin
+                    clk_div <= ~clk_div;
+                end
+        end
+
+endmodule
+```
+
+---
+
+## BCD_module.v
+
+Este módulo convierte un dígito BCD a su representación en **display de 7 segmentos**.
+
+```verilog
+module BCD_module (
+
+	input  [3:0] bcd_in,
+	output reg [6:0] bcd_out
+
+);
+
+	always @(*) 
+		begin
+			case (bcd_in)
+				4'b0000:bcd_out = ~7'b1111110;
+				4'b0001:bcd_out = ~7'b0110000;
+				4'b0010:bcd_out = ~7'b1101101;
+				4'b0011:bcd_out = ~7'b1111001;
+				4'b0100:bcd_out = ~7'b0110011;
+				4'b0101:bcd_out = ~7'b1011011;
+				4'b0110:bcd_out = ~7'b1011111;
+				4'b0111:bcd_out = ~7'b1110000;
+				4'b1000:bcd_out = ~7'b1111111;
+				4'b1001:bcd_out = ~7'b1111011;
+				default:bcd_out = ~7'b0000000;
+			endcase
+		end
+	
+endmodule
+```
+
+---
+
+## Testbench
+
+![Testbench](Practica_5_PWM/PWM_tb.png)
+
+---
+
+## Simulación del testbench
+
+![Simulación](Practica_5_PWM/PWM_SIM.png)
+
+---
+
+# Práctica 6: UART
+
+## UART_TX.v
+
+Este módulo implementa el **transmisor UART (Universal Asynchronous Receiver Transmitter)**.  
+Se encarga de enviar datos en serie a través de la línea `tx_out`.
+
+El funcionamiento se basa en una **máquina de estados** con cuatro etapas:
+
+- **IDLE:** la línea permanece en estado inactivo esperando iniciar transmisión.
+- **START_BIT:** se envía el bit de inicio (`0`).
+- **DATA_BITS:** se transmiten los bits del dato uno por uno.
+- **STOP_BIT:** se envía el bit de parada (`1`) y finaliza la transmisión.
+
+```verilog
+module UART_TX #(parameter BAUD_RATE = 9600, parameter CLOCK_FREQ = 50000000, parameter BITS = 8)(
+
+    input wire clk,
+    input wire rst,
+    input wire [BITS - 1:0] data_in,
+    input wire start,
+
+    output reg tx_out,
+    output reg busy
+
+);
+
+    localparam IDLE = 2'b00, START_BIT = 2'b01, DATA_BITS = 2'b10, STOP_BIT = 2'b11;
+
+    reg [1:0] state;
+    reg [3:0] bit_index;
+    reg [15:0] baud_counter;
+    reg [BITS-1:0] data_buffer;
+
+    always @(posedge clk or posedge rst)
+        begin
+            if (rst)
+                begin
+                    state <= IDLE;
+                    tx_out <= 1'b1;
+                    busy <= 0;
+                    bit_index <= 0;
+                    baud_counter <= 0;
+                end
+            else
+                begin
+                    case (state)
+
+                        IDLE:
+                            begin
+                                tx_out <= 1'b1;
+                                busy <= 0;
+
+                                if (start)
+                                    begin
+                                        data_buffer <= data_in;
+                                        state <= START_BIT;
+                                        busy <= 1;
+                                    end
+                            end
+
+                        START_BIT:
+                            begin
+                                tx_out <= 1'b0;
+
+                                if (baud_counter < (CLOCK_FREQ / BAUD_RATE) - 1)
+                                    baud_counter <= baud_counter + 1;
+                                else
+                                    begin
+                                        baud_counter <= 0;
+                                        state <= DATA_BITS;
+                                        bit_index <= 0;
+                                    end
+                            end
+
+                        DATA_BITS:
+                            begin
+                                tx_out <= data_buffer[bit_index];
+
+                                if (baud_counter < CLOCK_FREQ / BAUD_RATE - 1)
+                                    baud_counter <= baud_counter + 1;
+                                else
+                                    begin
+                                        baud_counter <= 0;
+
+                                        if (bit_index < BITS - 1)
+                                            bit_index <= bit_index + 1;
+                                        else
+                                            state <= STOP_BIT;
+                                    end
+                            end
+
+                        STOP_BIT:
+                            begin
+                                tx_out <= 1'b1;
+
+                                if (baud_counter < CLOCK_FREQ / BAUD_RATE - 1)
+                                    baud_counter <= baud_counter + 1;
+                                else
+                                    begin
+                                        baud_counter <= 0;
+                                        state <= IDLE;
+                                    end
+                            end
+
+                    endcase
+                end
+        end
+
+endmodule
+```
+
+---
+
+## UART_RX.v
+
+Este módulo implementa el **receptor UART**, encargado de recibir los datos seriales desde la línea `rx_in` y reconstruirlos en formato paralelo.
+
+El proceso de recepción sigue los siguientes estados:
+
+- **IDLE:** espera detectar el bit de inicio.
+- **START_BIT:** sincroniza la lectura en la mitad del bit.
+- **DATA_BITS:** captura los bits del dato uno por uno.
+- **STOP_BIT:** valida el bit de parada y habilita la señal `data_ready`.
+
+```verilog
+module UART_RX #(parameter BAUD_RATE = 9600, parameter CLOCK_FREQ = 50000000, parameter BITS = 8) (
+
+    input clk,
+    input rst,
+    input rx_in,
+
+    output reg [BITS - 1:0] data_out,
+    output reg data_ready
+
+);
+
+    localparam IDLE = 2'b00;
+    localparam START_BIT = 2'b01;
+    localparam DATA_BITS = 2'b10;
+    localparam STOP_BIT = 2'b11;
+
+    reg [1:0] state;
+    reg [3:0] bit_index;
+    reg [15:0] baud_counter;
+    reg [BITS-1:0] data_buffer;
+
+    always @(posedge clk or posedge rst)
+        begin
+            if (rst)
+                begin
+                    state <= IDLE;
+                    data_out <= 0;
+                    data_ready <= 0;
+                    bit_index <= 0;
+                    baud_counter <= 0;
+                end
+            else
+                begin
+                    case (state)
+
+                        IDLE:
+                            begin
+                                data_ready <= 0;
+
+                                if (!rx_in)
+                                    begin
+                                        state <= START_BIT;
+                                        baud_counter <= 0;
+                                    end
+                            end
+
+                        START_BIT:
+                            begin
+                                if (baud_counter < (CLOCK_FREQ / BAUD_RATE) / 2)
+                                    baud_counter <= baud_counter + 1;
+                                else
+                                    begin
+                                        baud_counter <= 0;
+                                        state <= DATA_BITS;
+                                        bit_index <= 0;
+                                    end
+                            end
+
+                        DATA_BITS:
+                            begin
+                                if (baud_counter < CLOCK_FREQ / BAUD_RATE - 1)
+                                    baud_counter <= baud_counter + 1;
+                                else
+                                    begin
+                                        baud_counter <= 0;
+                                        data_buffer[bit_index] <= rx_in;
+
+                                        if (bit_index < BITS - 1)
+                                            bit_index <= bit_index + 1;
+                                        else
+                                            state <= STOP_BIT;
+                                    end
+                            end
+
+                        STOP_BIT:
+                            begin
+                                if (baud_counter < CLOCK_FREQ / BAUD_RATE - 1)
+                                    baud_counter <= baud_counter + 1;
+                                else
+                                    begin
+                                        baud_counter <= 0;
+                                        data_out <= data_buffer;
+                                        data_ready <= 1;
+                                        state <= IDLE;
+                                    end
+                            end
+
+                    endcase
+                end
+        end
+
+endmodule
+```
+
+---
+
+## transmiter.v
+
+Este módulo funciona como el **top module del transmisor UART en la FPGA**.  
+Los switches (`SW`) permiten ingresar un valor de **8 bits**, el cual se envía mediante UART al presionar el botón `KEY[0]`.  
+
+El valor también se muestra en **tres displays de 7 segmentos**.
+
+```verilog
+module transmiter (
+
+    input CLOCK_50,
+    input [9:0] SW,
+    input [3:0] KEY,
+
+    output [0:6] HEX0,
+    output [0:6] HEX1,
+    output [0:6] HEX2,
+    output GPIO_0
+
+);
+
+    wire rst = SW[9];
+    wire start_signal = ~KEY[0];
+    wire uart_busy;
+    wire tx_line;
+
+    wire [7:0] cuenta = SW[7:0];
+
+    wire [3:0] un = cuenta % 10;
+    wire [3:0] de = (cuenta / 10) % 10;
+    wire [3:0] ce = (cuenta / 100) % 10;
+
+    UART_TX #(.BAUD_RATE(9600), .CLOCK_FREQ(50000000), .BITS(8)) uart_tx (
+        .clk(CLOCK_50),
+        .rst(rst),
+        .data_in(cuenta),
+        .start(start_signal),
+        .tx_out(tx_line),
+        .busy(uart_busy)
+    );
+
+    BCD_module unidades (
+        .bcd_in(un),
+        .bcd_out(HEX0)
+    );
+
+    BCD_module decenas (
+        .bcd_in(de),
+        .bcd_out(HEX1)
+    );
+
+    BCD_module centenas (
+        .bcd_in(ce),
+        .bcd_out(HEX2)
+    );
+
+    assign GPIO_0 = tx_line;
+
+endmodule
+```
+
+---
+
+## receiver.v
+
+Este módulo implementa el **receptor UART en la FPGA**.  
+Recibe los datos seriales desde `GPIO[0]`, los reconstruye usando el módulo `UART_RX` y posteriormente muestra el valor recibido en **tres displays de 7 segmentos**.
+
+```verilog
+module receiver (
+
+    input MAX10_CLK1_50,
+    input [9:0] SW,
+
+    output [0:6] HEX0,
+    output [0:6] HEX1,
+    output [0:6] HEX2,
+
+    input [35:0] GPIO
+
+);
+
+    wire rst = SW[9];
+
+    wire [7:0] dato_recibido;
+    wire rx_ready;
+
+    reg [7:0] dato_reg = 8'd0;
+
+    UART_RX #(.BAUD_RATE(9600), .CLOCK_FREQ(50000000)) uart_rx (
+        .clk(MAX10_CLK1_50),
+        .rst(rst),
+        .rx_in(GPIO[0]),
+        .data_out(dato_recibido),
+        .data_ready(rx_ready)
+    );
+
+    always @(posedge MAX10_CLK1_50 or posedge rst)
+        begin
+            if (rst)
+                dato_reg <= 8'd0;
+            else if (rx_ready)
+                dato_reg <= dato_recibido;
+        end
+
+    wire [3:0] un = dato_reg % 10;
+    wire [3:0] de = (dato_reg / 10) % 10;
+    wire [3:0] ce = (dato_reg / 100) % 10;
+
+    BCD_module unidades (
+        .bcd_in(un),
+        .bcd_out(HEX0)
+    );
+
+    BCD_module decenas (
+        .bcd_in(de),
+        .bcd_out(HEX1)
+    );
+
+    BCD_module centenas (
+        .bcd_in(ce),
+        .bcd_out(HEX2)
+    );
+
+endmodule
+```
+
+---
+
+## UART_tb.v
+
+El **testbench** verifica el funcionamiento del sistema UART conectando directamente el transmisor con el receptor.  
+Se generan datos aleatorios, se transmiten y posteriormente se verifica que el receptor reciba correctamente la misma información.
+
+```verilog
+module UART_tb ();
+
+    reg clk;
+    reg rst;
+    reg [7:0] data_in;
+    reg start;
+
+    wire busy;
+    wire UART_wire;
+
+    wire [7:0] data_out;
+    wire data_ready;
+
+    UART_TX #(.BAUD_RATE(9600), .CLOCK_FREQ(50000000), .BITS(8)) UART_TX (
+        .clk(clk),
+        .rst(rst),
+        .data_in(data_in),
+        .start(start),
+        .tx_out(UART_wire),
+        .busy(busy)
+    );
+
+    UART_RX #(.BAUD_RATE(9600), .CLOCK_FREQ(50000000), .BITS(8)) UART_RX (
+        .clk(clk),
+        .rst(rst),
+        .rx_in(UART_wire),
+        .data_out(data_out),
+        .data_ready(data_ready)
+    );
+
+    initial
+        begin
+            clk = 0;
+            rst = 0;
+            data_in = 8'h00;
+            start = 0;
+        end
+
+    always
+        #10 clk = ~clk;
+
+    initial
+        begin
+            $display("Simulación iniciada");
+
+            #30;
+
+            rst = 1;
+            #10;
+            rst = 0;
+
+            #20000;
+
+            repeat(10)
+                begin
+                    data_in = $random % 256;
+                    start = 1;
+                    #20;
+                    start = 0;
+
+                    @(posedge data_ready);
+                    #10;
+
+                    $display("Dato transmitido: %h, Dato recibido: %h", data_in, data_out);
+
+                    wait(busy == 0);
+                    #100;
+                end
+
+            $stop;
+            $finish;
+        end
+
+    initial
+        begin
+            $dumpfile("UART_tb.vcd");
+            $dumpvars(0, UART_tb);
+        end
+
+endmodule
+```
+
+---
+
+## Testbench
+
+![Testbench](Practica_6_UART/UART_tb.png)
+
+---
+
+## Simulación del testbench
+
+![Simulación](Practica_6_UART/UART_SIM.png)
+
+---
+
+## Prueba en la tarjeta FPGA
+
+[Ver video de la prueba](Practica_6_UART/UART.mp4)
+
+---
+
+# Práctica 7: VGA
+
+## hvsync_generator.v
+
+Este módulo genera las **señales de sincronización horizontal y vertical para VGA**.  
+También produce los contadores de posición del pixel (`CounterX` y `CounterY`) y la señal `inDisplayArea`, que indica cuándo el pixel se encuentra dentro del área visible de la pantalla.
+
+La resolución utilizada corresponde al estándar **640×480 a 60 Hz**.
+
+```verilog
+module hvsync_generator (
+
+    input clk,
+    input pixel_tick,
+
+    output vga_h_sync,
+    output vga_v_sync,
+
+    output reg inDisplayArea,
+    output reg [9:0] CounterX = 0,
+    output reg [9:0] CounterY = 0
+
+);
+
+    reg vga_HS = 0;
+    reg vga_VS = 0;
+
+    wire CounterXmaxed = (CounterX == 799);
+    wire CounterYmaxed = (CounterY == 524);
+
+    always @(posedge clk)
+        begin
+            if (pixel_tick)
+                begin
+                    if (CounterXmaxed)
+                        CounterX <= 0;
+                    else
+                        CounterX <= CounterX + 1;
+                end
+        end
+
+    always @(posedge clk)
+        begin
+            if (pixel_tick && CounterXmaxed)
+                begin
+                    if (CounterYmaxed)
+                        CounterY <= 0;
+                    else
+                        CounterY <= CounterY + 1;
+                end
+        end
+
+    always @(posedge clk)
+        begin
+            if (pixel_tick)
+                vga_HS <= (CounterX >= (640 + 16) && CounterX < (640 + 16 + 96));
+        end
+
+    always @(posedge clk)
+        begin
+            if (pixel_tick)
+                vga_VS <= (CounterY >= (480 + 10) && CounterY < (480 + 10 + 2));
+        end
+
+    always @(posedge clk)
+        begin
+            if (pixel_tick)
+                inDisplayArea <= (CounterX < 640) && (CounterY < 480);
+        end
+
+    assign vga_h_sync = ~vga_HS;
+    assign vga_v_sync = ~vga_VS;
+
+endmodule
+```
+
+---
+
+## VGADemo_Colores.v
+
+Este módulo genera un **patrón de colores simple en la pantalla VGA**.  
+El valor del color se obtiene a partir de los bits más significativos del contador horizontal (`CounterX`), lo que produce **bandas verticales de diferentes colores**.
+
+También se genera un **pixel clock de 25 MHz** a partir del reloj de 50 MHz de la FPGA utilizando un divisor simple.
+
+```verilog
+module VGADemo_Colores (
+
+    input MAX10_CLK1_50,
+    output reg [2:0] pixel,
+    output hsync_out,
+    output vsync_out
+
+);
+
+    wire inDisplayArea;
+    wire [9:0] CounterX;
+    wire [9:0] CounterY;
+
+    reg pixel_tick = 0;
+
+    always @(posedge MAX10_CLK1_50)
+        pixel_tick <= ~pixel_tick;
+
+    hvsync_generator hvsync (
+        .clk(MAX10_CLK1_50),
+        .pixel_tick(pixel_tick),
+        .vga_h_sync(hsync_out),
+        .vga_v_sync(vsync_out),
+        .CounterX(CounterX),
+        .CounterY(CounterY),
+        .inDisplayArea(inDisplayArea)
+    ); 
+
+    always @(posedge MAX10_CLK1_50)
+        begin
+            if (inDisplayArea)
+                pixel <= CounterX[9:6];
+            else
+                pixel <= 3'b000;
+        end
+        
+endmodule
+```
+
+---
+
+## VGADemo_Ajedrez.v
+
+Este módulo genera un **patrón de tablero de ajedrez** en la pantalla VGA.  
+El patrón se crea utilizando la operación XOR entre bits de los contadores `CounterX` y `CounterY`, lo que produce cuadros alternados blancos y negros.
+
+Cada cuadro del tablero se genera tomando un bit específico de cada contador para dividir la pantalla en regiones.
+
+```verilog
+module VGADemo_Ajedrez (
+
+    input MAX10_CLK1_50,
+
+    output [3:0] vga_red,
+    output [3:0] vga_green,
+    output [3:0] vga_blue,
+
+    output hsync_out,
+    output vsync_out
+
+);
+
+    wire inDisplayArea;
+    wire [9:0] CounterX;
+    wire [9:0] CounterY;
+
+    // Generador de 25 MHz
+    reg pixel_tick = 0;
+
+    always @(posedge MAX10_CLK1_50)
+        begin
+            pixel_tick <= ~pixel_tick;
+        end
+
+    hvsync_generator hvsync (
+
+        .clk(MAX10_CLK1_50),
+        .pixel_tick(pixel_tick),
+        .vga_h_sync(hsync_out),
+        .vga_v_sync(vsync_out),
+        .CounterX(CounterX),
+        .CounterY(CounterY),
+        .inDisplayArea(inDisplayArea)
+
+    );
+
+    // Lógica del patrón tipo ajedrez
+    wire is_white;
+
+    assign is_white = CounterX[6] ^ CounterY[6];
+
+    assign vga_red   = (inDisplayArea && is_white) ? 4'b1111 : 4'b0000;
+    assign vga_green = (inDisplayArea && is_white) ? 4'b1111 : 4'b0000;
+    assign vga_blue  = (inDisplayArea && is_white) ? 4'b1111 : 4'b0000;
+
+endmodule
+```
+
+---
+
+## Resultado del patrón de colores
+
+![Patrón de Colores](Practica_7_VGA/VGA_Colores.jpeg)
+
+---
+
+## Resultado del patrón tipo ajedrez
+
+![Patrón Ajedrez](Practica_7_VGA/VGA_Ajedrez.jpeg)
+
+---
+
+# Mini Challenge 1: Debouncer
+
+## debouncer_wr.v
+
+Este módulo funciona como **wrapper del sistema de debouncing**.  
+Conecta los botones (`KEY`), el reloj de la FPGA y los módulos internos encargados de limpiar la señal del botón, detectar el flanco de subida y contar las pulsaciones.
+
+El valor del contador se muestra tanto en los **LEDs de la tarjeta** como en **cuatro displays de 7 segmentos**.
+
+```verilog
+module debouncer_wr (
+
+    input MAX10_CLK1_50,
+    input [1:0] KEY,
+    output [9:0] LEDR,
+
+    output [0:6] HEX0,
+    output [0:6] HEX1,
+    output [0:6] HEX2,
+    output [0:6] HEX3
+
+);
+
+    wire clk;
+    wire rst;
+    wire boton_in;
+    wire boton_limpio;
+    wire pulso;
+
+    wire [9:0] contador;
+
+    assign clk = MAX10_CLK1_50;
+    assign rst = ~KEY[1];
+    assign boton_in = ~KEY[0];
+
+    debouncer Debouncer (
+        .clk(clk),
+        .rst(rst),
+        .boton_in(boton_in),
+        .boton_out(boton_limpio)
+    );
+
+    edge_detector EdgeDetector (
+        .clk(clk),
+        .rst(rst),
+        .boton_out(boton_limpio),
+        .pulso(pulso)
+    );
+
+    counter_debouncer CounterDebouncer (
+        .clk(clk),
+        .rst(rst),
+        .pulso(pulso),
+        .leds(contador)
+    );
+
+    assign LEDR = contador;
+
+    BCD_4Displays BCD (
+        .bcd_in(contador),
+        .D_un(HEX0),
+        .D_de(HEX1),
+        .D_ce(HEX2),
+        .D_mi(HEX3)
+    );
+
+endmodule
+```
+
+---
+
+## debouncer.v
+
+Este módulo implementa el **debouncer**, cuya función es eliminar el rebote mecánico de los botones.  
+
+Cuando se detecta un cambio en la entrada `boton_in`, se inicia un contador.  
+Si el cambio se mantiene estable durante un tiempo determinado (`MAX_COUNT`), entonces la salida `boton_out` se actualiza.
+
+```verilog
+module debouncer (
+
+    input  clk,
+    input  rst,
+    input  boton_in,
+    output reg boton_out
+
+);
+
+    parameter MAX_COUNT = 1000000;
+
+    reg [19:0] contador;
+
+    always @(posedge clk or posedge rst)
+        begin
+            if (rst)
+                begin
+                        boton_out <= 0;
+                        contador <= 0;
+                end
+            else
+                begin
+                        if (boton_in != boton_out)
+                            begin
+                                contador <= contador + 1;
+                                if (contador == MAX_COUNT)
+                                    begin
+                                        boton_out <= boton_in;
+                                        contador  <= 0;
+                                    end
+                            end
+                        else
+                            begin
+                                contador <= 0;
+                            end
+                end
+        end
+endmodule
+```
+
+---
+
+## edge_detector.v
+
+Este módulo detecta el **flanco de subida** del botón ya debounced.  
+
+Cuando la señal pasa de `0` a `1`, se genera un **pulso de un solo ciclo de reloj**, lo cual permite activar correctamente el contador.
+
+```verilog
+module edge_detector (
+
+    input clk,
+    input rst,
+    input boton_out,
+    output reg pulso
+
+);
+    reg boton_d;
+
+    always @(posedge clk or posedge rst)
+        begin
+            if (rst)
+                begin
+                    boton_d <= 0;
+                    pulso <= 0;
+                end
+            else
+                begin
+                    boton_d <= boton_out;
+                    pulso <= boton_out & ~boton_d;
+                end
+        end
+endmodule
+```
+
+---
+
+## debouncer_tb.v
+
+Este **testbench** verifica el funcionamiento del sistema completo.  
+Simula varias presiones del botón y un reset para comprobar que el contador solo se incrementa una vez por cada pulsación limpia.
+
+```verilog
+module debouncer_tb;
+
+    reg clk;
+    reg [1:0] KEY;
+    wire [9:0] LEDR;
+
+    debouncer_wr DUT (
+        .MAX10_CLK1_50(clk),
+        .KEY(KEY),
+        .LEDR(LEDR)
+    );
+
+    initial
+        clk = 0;
+
+    always
+        #10 clk = ~clk;
+
+    initial
+    begin
+        KEY = 2'b11;
+
+        $display("Inicio de simulación");
+        $monitor("Tiempo=%0t | KEY=%b | Contador=%d", $time, KEY, LEDR);
+
+        #100;
+
+        KEY[1] = 0;
+        #21000000;
+        KEY[1] = 1;
+        #21000000;
+
+        $display("Primera presión");
+
+        KEY[0] = 0;
+        #21000000;
+        KEY[0] = 1;
+        #21000000;
+
+        $display("Segunda presión");
+
+        KEY[0] = 0;
+        #21000000;
+        KEY[0] = 1;
+        #21000000;
+
+        $display("Reset");
+
+        KEY[1] = 0;
+        #21000000;
+        KEY[1] = 1;
+        #21000000;
+
+        $display("Fin de simulación");
+        $finish;
+    end
+
+    initial 
+        begin
+            $dumpfile("debouncer_tb.vcd");
+            $dumpvars(0, debouncer_tb);
+        end
+
+endmodule
+```
+
+---
+
+## Testbench
+
+![Testbench](Mini_Challenge_Debouncer/Debouncer_tb.png)
