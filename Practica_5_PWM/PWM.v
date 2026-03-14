@@ -34,7 +34,7 @@ module PWM (
 
     parameter maxCount = 500000;
 
-    clock_divider #(.FREQ(25000000)) clk_div (
+    clock_divider #(.FREQ(25000000)) clkdiv (
         .clk(MAX10_CLK1_50),
         .rst(rst),
         .clk_div(clk_div)
