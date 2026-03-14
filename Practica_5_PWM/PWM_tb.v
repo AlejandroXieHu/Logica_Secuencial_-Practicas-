@@ -46,7 +46,7 @@ module PWM_tb ();
                     SW[8:1] = $random % 200; //Prueba con varios grados
                     #2000000;
 
-                    $display("Grado=%d | PWM=%b", SW[8:1], ARDUINO_IO[0]);
+                    $display("Grados solicitados = %d | Grados limitados = %d | PWM = %b", SW[8:1], PWM.grado, ARDUINO_IO[0]);
                 end
 
             $stop;
