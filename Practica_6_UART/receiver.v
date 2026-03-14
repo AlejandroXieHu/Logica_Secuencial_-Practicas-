@@ -1,4 +1,4 @@
-module receiver(
+module receiver (
 
     input MAX10_CLK1_50,
     input [9:0] SW,
